@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Application</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            var socket = io.connect('http://' + document.domain + ':' + location.port);
+            let currentRoom = null;
+
+            function joinRoom(room, username) {
+                if (currentRoom) {
+                    socket.emit('leave', {
+                        username: username,
+                        room: currentRoom
+                    });
+                }
+                currentRoom = room;
+                socket.emit('join', {
+                    username: username,
+                    room: room
+                });
+                document.getElementById('room-name').textContent = room;
+                loadRoomUsers(room);
+            }
+
+            function loadRooms() {
+                fetch('/rooms')
+                    .then(response => response.json())
+                    .then(data => {
+                        const roomList = document.getElementById('rooms');
+                        roomList.innerHTML = '';
+                        data.forEach(room => {
+                            const roomItem = document.createElement('li');
+                            roomItem.textContent = room;
+                            roomItem.onclick = () => joinRoom(room, username);
+                            roomList.appendChild(roomItem);
+                        });
+                    });
+            }
+
+            function loadRoomUsers(room) {
+                fetch(`/rooms/${room}`)
+                    .then(response => response.json())
+                    .then(users => {
+                        const userList = document.getElementById('users');
+                        userList.innerHTML = '';
+                        users.forEach(user => {
+                            const userItem = document.createElement('li');
+                            userItem.textContent = user;
+                            userList.appendChild(userItem);
+                        });
+                    });
+            }
+
+            socket.on('connect', () => {
+                username = prompt('Enter your username:');
+                loadRooms();
+            });
+
+            socket.on('room_users', (users) => {
+                const userList = document.getElementById('users');
+                userList.innerHTML = '';
+                users.forEach(user => {
+                    const userItem = document.createElement('li');
+                    userItem.textContent = user;
+                    userList.appendChild(userItem);
+                });
+            });
+
+            socket.on('message', (msg) => {
+                let messageElement = document.createElement('li');
+                messageElement.textContent = msg;
+                document.getElementById('messages').appendChild(messageElement);
+            });
+
+            document.getElementById('send').onclick = () => {
+                let messageInput = document.getElementById('message');
+                socket.emit('message', {
+                    username: username,
+                    message: messageInput.value,
+                    room: currentRoom
+                });
+                messageInput.value = '';
+            };
+
+            document.getElementById('create-room').onclick = () => {
+                const newRoom = prompt('Enter new room name:');
+                if (newRoom) {
+                    joinRoom(newRoom, username);
+                    loadRooms();
+                }
+            };
+        });
+    </script>
+</head>
+<body>
+    <h1>Chat Application</h1>
+    <div>
+        <h2>Rooms</h2>
+        <ul id="rooms"></ul>
+        <button id="create-room">Create Room</button>
+    </div>
+    <div>
+        <h2>Room: <span id="room-name"></span></h2>
+        <ul id="users"></ul>
+        <ul id="messages"></ul>
+        <input id="message" autocomplete="off">
+        <button id="send">Send</button>
+    </div>
+</body>
+</html>
